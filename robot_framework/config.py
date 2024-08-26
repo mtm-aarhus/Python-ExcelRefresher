@@ -12,7 +12,7 @@ SMTP_PORT = 25
 SCREENSHOT_SENDER = "rpamtm001@aarhus.dk"
 
 # Constant/Credential names
-ERROR_EMAIL = "jadt@aarhus.dk"
+ERROR_EMAIL = "jadt"
 
 
 # Queue specific configs
