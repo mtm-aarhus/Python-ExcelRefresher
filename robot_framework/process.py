@@ -15,13 +15,10 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
     if len(values) >= 2:
         first_value = values[0]
         second_value = values[1]
-        return first_value, second_value
+        print(second_value)
+        open_close_as_excel(first_value)
     else:
         raise ValueError("Queue element does not contain enough values")
-    
-    print(second_value)
-    open_close_as_excel(first_value)
-    
 
 
 def open_close_as_excel(file_path):
