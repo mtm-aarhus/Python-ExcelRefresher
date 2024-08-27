@@ -40,7 +40,7 @@ def main():
                     break  # Break queue loop
 
                 try:
-                    process.process(orchestrator_connection)
+                    process.process(orchestrator_connection, queue_element)
                     orchestrator_connection.set_queue_element_status(queue_element.id, QueueStatus.DONE)
 
                 except BusinessError as error:
@@ -60,3 +60,5 @@ def main():
 
     if config.FAIL_ROBOT_ON_TOO_MANY_ERRORS and error_count == config.MAX_RETRY_COUNT:
         raise RuntimeError("Process failed too many times.")
+
+main()

@@ -1,14 +1,15 @@
 """This module contains the main process of the robot."""
 
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
+from OpenOrchestrator.database.queues import QueueElement
 import win32com.client as win32
 import pythoncom
 
 
-def process(orchestrator_connection: OrchestratorConnection) -> None:
+def process(orchestrator_connection: OrchestratorConnection, queue_element: QueueElement | None = None) -> None:
     """Do the primary process of the robot."""
     orchestrator_connection.log_trace("Running process.")
-    queue_element = orchestrator_connection.get_next_queue_element('ExcelRefresher','',True)
+    print(queue_element.__dict__)
     values = queue_element.data.split('|')
     
     # Assign values to variables
@@ -24,21 +25,20 @@ def process(orchestrator_connection: OrchestratorConnection) -> None:
 def open_close_as_excel(file_path):
     try:
         pythoncom.CoInitialize()
-        Xlsx = win32.DispatchEx('Excel.Application')
-        Xlsx.DisplayAlerts = True
-        Xlsx.Visible = True
-        book = Xlsx.Workbooks.Open(file_path)
+        xlsx = win32.DispatchEx('Excel.Application')
+        xlsx.DisplayAlerts = True
+        xlsx.Visible = True
+        book = xlsx.Workbooks.Open(file_path)
         book.RefreshAll()
-        Xlsx.CalculateUntilAsyncQueriesDone()
+        xlsx.CalculateUntilAsyncQueriesDone()
         book.Save()
         book.Close(SaveChanges=True)
-        Xlsx.Quit()
+        xlsx.Quit()
         pythoncom.CoUninitialize()
-
         book = None
-        Xlsx = None
+        xlsx = None
         del book
-        del Xlsx
+        del xlsx
         print("-- Opened/Closed as Excel --")
 
     except Exception as e:
@@ -47,4 +47,4 @@ def open_close_as_excel(file_path):
     finally:
         # RELEASES RESOURCES
         book = None
-        Xlsx = None
+        xlsx = None
