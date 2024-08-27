@@ -23,28 +23,18 @@ def process(orchestrator_connection: OrchestratorConnection, queue_element: Queu
 
 
 def open_close_as_excel(file_path):
-    try:
-        pythoncom.CoInitialize()
-        xlsx = win32.DispatchEx('Excel.Application')
-        xlsx.DisplayAlerts = True
-        xlsx.Visible = True
-        book = xlsx.Workbooks.Open(file_path)
-        book.RefreshAll()
-        xlsx.CalculateUntilAsyncQueriesDone()
-        book.Save()
-        book.Close(SaveChanges=True)
-        xlsx.Quit()
-        pythoncom.CoUninitialize()
-        book = None
-        xlsx = None
-        del book
-        del xlsx
-        print("-- Opened/Closed as Excel --")
-
-    except Exception as e:
-        print(e)
-
-    finally:
-        # RELEASES RESOURCES
-        book = None
-        xlsx = None
+    pythoncom.CoInitialize()
+    xlsx = win32.DispatchEx('Excel.Application')
+    xlsx.DisplayAlerts = True
+    xlsx.Visible = True
+    book = xlsx.Workbooks.Open(file_path)
+    book.RefreshAll()
+    xlsx.CalculateUntilAsyncQueriesDone()
+    book.Save()
+    book.Close(SaveChanges=True)
+    xlsx.Quit()
+    pythoncom.CoUninitialize()
+    book = None
+    xlsx = None
+    del book
+    del xlsx
