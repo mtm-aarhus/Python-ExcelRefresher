@@ -17,7 +17,6 @@ from datetime import datetime, timedelta, timezone
 import pyodbc
 import json
 
-
 def main():
     """The entry point for the framework. Should be called as the first thing when running the robot."""
     orchestrator_connection = OrchestratorConnection.create_connection_from_args()
@@ -25,10 +24,9 @@ def main():
     orchestrator_connection.log_trace("Robot Framework started.")
     initialize.initialize(orchestrator_connection)
     sql_server = orchestrator_connection.get_constant("SqlServer")
-
+    conn_string = "DRIVER={SQL Server};"+f"SERVER={sql_server.value};DATABASE=PYORCHESTRATOR;Trusted_Connection=yes;"
     # Gets queue from db
-    conn = pyodbc.connect(
-   "DRIVER={SQL Server};"+f"SERVER={sql_server};DATABASE=PYORCHESTRATOR;Trusted_Connection=yes;")
+    conn = pyodbc.connect(conn_string)
 
     # Get the current UTC time and 24-hour threshold
     current_time = datetime.now(timezone.utc)  # Timezone-aware UTC time
