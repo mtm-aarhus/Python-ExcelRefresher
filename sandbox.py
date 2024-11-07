@@ -5,7 +5,6 @@ from office365.runtime.auth.user_credential import UserCredential
 from office365.sharepoint.client_context import ClientContext
 import time
 
-
 def sharepoint_client(username: str, password: str, sharepoint_site_url: str) -> ClientContext:
     """
     Creates and returns a SharePoint client context.
@@ -140,10 +139,10 @@ username = RobotCredentials.username
 password = RobotCredentials.password
 
 # SharePoint site URL
-SHAREPOINT_SITE_URL = "https://aarhuskommune.sharepoint.com/Teams/tea-teamsite10014"
+SHAREPOINT_SITE_URL = "https://aarhuskommune.sharepoint.com/Teams/tea-teamsite12345678"
 
 # SharePoint file URL (full path including root folder and subfolder)
-sharepoint_file_url = "Delte dokumenter/Tilladelser.xlsx"
+sharepoint_file_url = "Delte dokumenter/filename.xlsx"
 
 # 1. Create the SharePoint client
 client = sharepoint_client(username, password, SHAREPOINT_SITE_URL)

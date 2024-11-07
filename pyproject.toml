@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "robot_framework"
 version = "0.0.1"
 authors = [
-  { name="ITK Development", email="itk-rpa@mkb.aarhus.dk" },
+  { name="MTM Digitalisering", email="avoidspam@thankyou.dk" },
 ]
 readme = "README.md"
 requires-python = ">=3.11"
@@ -18,8 +18,8 @@ classifiers = [
 dependencies = [
     "OpenOrchestrator == 1.*",
     "Pillow == 9.5.0",
-    "pywin32",
-    
+    "Office365-REST-Python-Client == 2.5.13"
+    "pywin32 == 306"    
 ]
 
 [project.optional-dependencies]

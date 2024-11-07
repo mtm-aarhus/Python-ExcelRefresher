@@ -13,6 +13,9 @@ from robot_framework import reset
 from robot_framework.exceptions import handle_error, BusinessError, log_exception
 from robot_framework import process
 from robot_framework import config
+from datetime import datetime, timedelta, timezone
+import pyodbc
+import json
 
 
 def main():
@@ -21,6 +24,45 @@ def main():
     sys.excepthook = log_exception(orchestrator_connection)
     orchestrator_connection.log_trace("Robot Framework started.")
     initialize.initialize(orchestrator_connection)
+    sql_server = orchestrator_connection.get_constant("SqlServer")
+
+    # Gets queue from db
+    conn = pyodbc.connect(
+   "DRIVER={SQL Server};"+f"SERVER={sql_server};DATABASE=PYORCHESTRATOR;Trusted_Connection=yes;")
+
+    # Get the current UTC time and 24-hour threshold
+    current_time = datetime.now(timezone.utc)  # Timezone-aware UTC time
+    time_threshold = current_time - timedelta(hours=24)
+
+    # Step 1: Fetch rows where the timestamp is more than 24 hours old
+    query = """
+    SELECT SharePointSite, FolderPath, CustomFunction
+    FROM [PyOrchestrator].[dbo].[QueueExcelRefresher]
+    WHERE TimeStamp < ? OR TimeStamp IS NULL
+    """
+    cursor = conn.cursor()
+    cursor.execute(query, time_threshold)
+
+    # Retrieve data and prepare `references` and `data`
+    rows = cursor.fetchall()
+    if rows:
+        references = tuple(row[1] for row in rows)  # Using FolderPath as the reference
+
+        # Convert each row to a JSON string for structured data storage
+        data = tuple(json.dumps({
+            "SharePointSite": row[0],
+            "FolderPath": row[1],
+            "CustomFunction": row[2]
+        }) for row in rows)
+
+        # Call bulk_create_queue_elements with JSON-formatted data
+        orchestrator_connection.bulk_create_queue_elements("ExcelRefresher", references=references, data=data)
+        update_query = """
+        UPDATE [PyOrchestrator].[dbo].[QueueExcelRefresher]
+        SET TimeStamp = ? WHERE TimeStamp < ? OR TimeStamp IS NULL
+        """
+        cursor.execute(update_query, (current_time, time_threshold))
+        conn.commit()
 
     queue_element = None
     error_count = 0

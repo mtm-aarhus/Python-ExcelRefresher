@@ -9,7 +9,7 @@ FAIL_ROBOT_ON_TOO_MANY_ERRORS = True
 # Error screenshot config
 SMTP_SERVER = "smtp.aarhuskommune.local"
 SMTP_PORT = 25
-SCREENSHOT_SENDER = "rpamtm001@aarhus.dk"
+SCREENSHOT_SENDER = "robotdummymail@aarhus.dk"
 
 # Constant/Credential names
 ERROR_EMAIL = "jadt"
