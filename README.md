@@ -2,21 +2,6 @@
 
 This project automates the process of refreshing data in Excel files and uploading them to SharePoint using OpenOrchestrator and Robot Framework. The automation is set up to run periodically, leveraging queues and structured error handling.
 
----
-
-## Overview
-
-The main functionality includes:
-- Fetching queue from a SQL Server database.
-- Downloading Excel files from SharePoint.
-- Refreshing the Excel data.
-- Uploading the refreshed files back to SharePoint.
-- Utilizing custom functions, such as creating monthly folders.
-
-The entire process is managed automatically with OpenOrchestrator, making it easy to maintain and scale as needed.
-
----
-
 ## Dependencies
 
 - `OpenOrchestrator == 1.*`
@@ -24,14 +9,12 @@ The entire process is managed automatically with OpenOrchestrator, making it eas
 - `Office365-REST-Python-Client == 2.5.13`
 - `pywin32 == 306`
 
----
 
 ## Configuration
 
 1. **Queue Configuration:**
    - The automation fetches queue elements from a SQL Server database. The query retrieves entries where the `TimeStamp` is older than 24 hours or is null, ensuring that the data is refreshed periodically.
 
----
 
 ## How It Works
 
@@ -46,7 +29,6 @@ The entire process is managed automatically with OpenOrchestrator, making it eas
    - Saves and uploads the refreshed file back to SharePoint.
    - Optionally, creates monthly folders named in Danish if the custom function is specified.
 
----
 
 ## Code Walkthrough
 
