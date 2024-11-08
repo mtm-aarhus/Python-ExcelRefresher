@@ -1,3 +1,109 @@
+# Excel Data Refresher Process
+
+This project automates the process of refreshing data in Excel files and uploading them to SharePoint using OpenOrchestrator and Robot Framework. The automation is set up to run periodically, leveraging queues and structured error handling.
+
+---
+
+## Overview
+
+The main functionality includes:
+- Fetching queue from a SQL Server database.
+- Downloading Excel files from SharePoint.
+- Refreshing the Excel data.
+- Uploading the refreshed files back to SharePoint.
+- Utilizing custom functions, such as creating monthly folders.
+
+The entire process is managed automatically with OpenOrchestrator, making it easy to maintain and scale as needed.
+
+---
+
+## Dependencies
+
+- `OpenOrchestrator == 1.*`
+- `Pillow == 9.5.0`
+- `Office365-REST-Python-Client == 2.5.13`
+- `pywin32 == 306`
+
+---
+
+## Configuration
+
+1. **Queue Configuration:**
+   - The automation fetches queue elements from a SQL Server database. The query retrieves entries where the `TimeStamp` is older than 24 hours or is null, ensuring that the data is refreshed periodically.
+
+---
+
+## How It Works
+
+1. **Fetching Queue Elements:**
+   - Establishes a connection to SQL Server using `pyodbc`.
+   - Retrieves rows from `QueueExcelRefresher` where `TimeStamp` is outdated.
+   - Adds the data to an orchestrator queue for further processing.
+
+2. **Processing Each Queue Element:**
+   - Downloads the specified Excel file from SharePoint.
+   - Refreshes the data using `win32com.client`.
+   - Saves and uploads the refreshed file back to SharePoint.
+   - Optionally, creates monthly folders named in Danish if the custom function is specified.
+
+---
+
+## Code Walkthrough
+
+### Fetch Queue Elements
+This is added to the queue_framework.py file to fetch and dispatch the queue from the PyOrchestrator db in the OpenOrchestrator SQL server. To avoid the same queue elements being run again if it runs every queue element multiple times a day for testing new queue elements, it only fetches timestamp from today and then writes the current timestamp for all the rows it just added to the queue. It dispatches the queuelement as a json file
+
+```python
+sql_server = orchestrator_connection.get_constant("SqlServer")
+conn_string = "DRIVER={SQL Server};" + f"SERVER={sql_server.value};DATABASE=PYORCHESTRATOR;Trusted_Connection=yes;"
+conn = pyodbc.connect(conn_string)
+ac
+current_time = datetime.now(timezone.utc)
+time_threshold = current_time - timedelta(hours=24)
+
+query = """
+SELECT SharePointSite, FolderPath, CustomFunction
+FROM [PyOrchestrator].[dbo].[QueueExcelRefresher]
+WHERE TimeStamp < ? OR TimeStamp IS NULL
+"""
+cursor = conn.cursor()
+cursor.execute(query, time_threshold)
+rows = cursor.fetchall()
+if rows:
+    references = tuple(row[1] for row in rows)  # Using FolderPath as the reference
+
+    # Convert each row to a JSON string for structured data storage
+    data = tuple(json.dumps({
+        "SharePointSite": row[0],
+        "FolderPath": row[1],
+        "CustomFunction": row[2]
+    }) for row in rows)
+
+    # Call bulk_create_queue_elements with JSON-formatted data
+    orchestrator_connection.bulk_create_queue_elements("ExcelRefresher", references=references, data=data)
+    update_query = """
+    UPDATE [PyOrchestrator].[dbo].[QueueExcelRefresher]
+    SET TimeStamp = ? WHERE TimeStamp < ? OR TimeStamp IS NULL
+    """
+    cursor.execute(update_query, (current_time, time_threshold))
+    conn.commit()
+```
+
+
+### Custom Functionality
+Certain queue elements deviates a little from the main process, so instead of having individual processes for small deviations they are incorporated into the process.
+
+- **Monthly Folder Creation:**
+  - Creates folders named in Danish, such as "Januar" or "Februar".
+  - Stores the files in these organized monthly folders.
+
+---
+
+## Contact
+
+For any questions or issues, feel free to reach out to the project maintainers.
+
+
 # Robot-Framework V2
 
 This repo is meant to be used as a template for robots made for [OpenOrchestrator](https://github.com/itk-dev-rpa/OpenOrchestrator).
