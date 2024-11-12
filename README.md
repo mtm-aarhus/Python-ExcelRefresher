@@ -5,7 +5,7 @@ This project automates the process of refreshing data in Excel files and uploadi
 ## Dependencies
 
 - `OpenOrchestrator == 1.*`
-- `Pillow == 9.5.0`
+- `Pillow == 10.*`
 - `Office365-REST-Python-Client == 2.5.13`
 - `pywin32 == 306`
 
@@ -41,7 +41,7 @@ conn_string = "DRIVER={SQL Server};" + f"SERVER={sql_server.value};DATABASE=PYOR
 conn = pyodbc.connect(conn_string)
 ac
 current_time = datetime.now(timezone.utc)
-time_threshold = current_time - timedelta(hours=24)
+time_threshold = current_time - timedelta(hours=20)
 
 query = """
 SELECT SharePointSite, FolderPath, CustomFunction

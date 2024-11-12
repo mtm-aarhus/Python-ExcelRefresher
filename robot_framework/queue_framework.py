@@ -30,9 +30,9 @@ def main():
 
     # Get the current UTC time and 24-hour threshold
     current_time = datetime.now(timezone.utc)  # Timezone-aware UTC time
-    time_threshold = current_time - timedelta(hours=24)
+    time_threshold = current_time - timedelta(hours=20)
 
-    # Step 1: Fetch rows where the timestamp is more than 24 hours old
+    # Step 1: Fetch rows where the timestamp is more than 20 hours old
     query = """
     SELECT SharePointSite, FolderPath, CustomFunction
     FROM [PyOrchestrator].[dbo].[QueueExcelRefresher]
