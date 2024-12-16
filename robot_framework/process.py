@@ -11,10 +11,7 @@ import json
 import datetime
 import locale
 from pebble import concurrent
-
-@concurrent.process(timeout=60)  # Timeout after 30 minutes (1800 seconds)
-def refresh_excel_file_with_timeout(file_path, orchestrator_connection: OrchestratorConnection):
-    refresh_excel_file(file_path, orchestrator_connection)  # Calls your actual function
+)
 
 def process(orchestrator_connection: OrchestratorConnection, queue_element: QueueElement | None = None) -> None:
     """Do the primary process of the robot."""
@@ -37,7 +34,7 @@ def process(orchestrator_connection: OrchestratorConnection, queue_element: Queu
         local_file_path = download_file_from_sharepoint(client, folder_path, orchestrator_connection)
 
          # Run refresh_excel_file with timeout handling
-        future = refresh_excel_file_with_timeout(local_file_path, orchestrator_connection)
+        future = refresh_excel_file(local_file_path, orchestrator_connection)
 
         try:
             future.result()  # Wait for the result
@@ -117,7 +114,7 @@ def download_file_from_sharepoint(client: ClientContext, sharepoint_file_url: st
     orchestrator_connection.log_info(f"[Ok] file has been downloaded into: {download_path}")
     return download_path
 
-
+@concurrent.process(timeout=60)  # Timeout after 30 minutes (1800 seconds)
 def refresh_excel_file(file_path: str, orchestrator_connection: OrchestratorConnection):
     """
     Refreshes an Excel file at the specified file path.
