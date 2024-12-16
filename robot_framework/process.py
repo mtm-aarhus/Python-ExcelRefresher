@@ -11,7 +11,6 @@ import json
 import datetime
 import locale
 from pebble import concurrent
-)
 
 def process(orchestrator_connection: OrchestratorConnection, queue_element: QueueElement | None = None) -> None:
     """Do the primary process of the robot."""
@@ -40,8 +39,8 @@ def process(orchestrator_connection: OrchestratorConnection, queue_element: Queu
             future.result()  # Wait for the result
         except Exception as e:
             if "timeout" in str(e).lower():  # Check if the exception indicates a timeout
-                orchestrator_connection.log_error("refresh_excel_file exceeded the timeout of 30 minutes.")
-                raise RuntimeError("refresh_excel_file did not complete within the allowed time.")
+                orchestrator_connection.log_error(f"refresh_excel_file exceeded the timeout of 30 minutes. {e}")
+                raise RuntimeError(f"refresh_excel_file did not complete within the allowed time. {e}")
             else:
                 orchestrator_connection.log_error(f"An error occurred during refresh_excel_file execution: {e}")
                 raise RuntimeError(f"Error in refresh_excel_file: {e}")
