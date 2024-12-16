@@ -11,6 +11,7 @@ import json
 import datetime
 import locale
 from pebble import concurrent
+import subprocess
 
 def process(orchestrator_connection: OrchestratorConnection, queue_element: QueueElement | None = None) -> None:
     """Do the primary process of the robot."""
@@ -47,6 +48,7 @@ def process(orchestrator_connection: OrchestratorConnection, queue_element: Queu
 
         upload_file_to_sharepoint(client, folder_path, local_file_path, custom_function, orchestrator_connection)
     except Exception as e:
+        subprocess.call("taskkill /im excel.exe /f >nul 2>&1", shell=True)
         os.remove(local_file_path)
         orchestrator_connection.log_error(str(e))
         raise e
@@ -113,7 +115,7 @@ def download_file_from_sharepoint(client: ClientContext, sharepoint_file_url: st
     orchestrator_connection.log_info(f"[Ok] file has been downloaded into: {download_path}")
     return download_path
 
-@concurrent.process(timeout=60)  # Timeout after 30 minutes (1800 seconds)
+@concurrent.process(timeout=1800)  # Timeout after 30 minutes (1800 seconds)
 def refresh_excel_file(file_path: str, orchestrator_connection: OrchestratorConnection):
     """
     Refreshes an Excel file at the specified file path.
