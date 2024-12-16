@@ -19,7 +19,8 @@ dependencies = [
     "OpenOrchestrator == 1.*",
     "Pillow == 10.*",
     "Office365-REST-Python-Client == 2.5.13",
-    "pywin32 == 306"    
+    "pywin32 == 306",
+    "Pebble == 5.1.0"
 ]
 
 [project.optional-dependencies]
