@@ -10,6 +10,11 @@ import time
 import json
 import datetime
 import locale
+from pebble import concurrent
+
+@concurrent.process(timeout=60)  # Timeout after 30 minutes (1800 seconds)
+def refresh_excel_file_with_timeout(file_path, orchestrator_connection: OrchestratorConnection):
+    refresh_excel_file(file_path, orchestrator_connection)  # Calls your actual function
 
 def process(orchestrator_connection: OrchestratorConnection, queue_element: QueueElement | None = None) -> None:
     """Do the primary process of the robot."""
@@ -31,7 +36,18 @@ def process(orchestrator_connection: OrchestratorConnection, queue_element: Queu
         # 2. Download the file from SharePoint
         local_file_path = download_file_from_sharepoint(client, folder_path, orchestrator_connection)
 
-        refresh_excel_file(local_file_path, orchestrator_connection)
+         # Run refresh_excel_file with timeout handling
+        future = refresh_excel_file_with_timeout(local_file_path, orchestrator_connection)
+
+        try:
+            future.result()  # Wait for the result
+        except Exception as e:
+            if "timeout" in str(e).lower():  # Check if the exception indicates a timeout
+                orchestrator_connection.log_error("refresh_excel_file exceeded the timeout of 30 minutes.")
+                raise RuntimeError("refresh_excel_file did not complete within the allowed time.")
+            else:
+                orchestrator_connection.log_error(f"An error occurred during refresh_excel_file execution: {e}")
+                raise RuntimeError(f"Error in refresh_excel_file: {e}")
 
         upload_file_to_sharepoint(client, folder_path, local_file_path, custom_function, orchestrator_connection)
     except Exception as e:
