@@ -34,10 +34,12 @@ def process(orchestrator_connection: OrchestratorConnection, queue_element: Queu
         local_file_path = download_file_from_sharepoint(client, folder_path, orchestrator_connection)
 
          # Run refresh_excel_file with timeout handling
-        future = refresh_excel_file(local_file_path, orchestrator_connection)
+        future = refresh_excel_file(local_file_path)
 
         try:
             future.result()  # Wait for the result
+            orchestrator_connection.log_info(f"[Ok] Excel file at {local_file_path} has been refreshed and saved.")
+
         except Exception as e:
             if "timeout" in str(e).lower():  # Check if the exception indicates a timeout
                 orchestrator_connection.log_error(f"refresh_excel_file exceeded the timeout of 30 minutes. {e}")
@@ -116,7 +118,7 @@ def download_file_from_sharepoint(client: ClientContext, sharepoint_file_url: st
     return download_path
 
 @concurrent.process(timeout=1800)  # Timeout after 30 minutes (1800 seconds)
-def refresh_excel_file(file_path: str, orchestrator_connection: OrchestratorConnection):
+def refresh_excel_file(file_path: str):
     """
     Refreshes an Excel file at the specified file path.
     """
@@ -146,8 +148,6 @@ def refresh_excel_file(file_path: str, orchestrator_connection: OrchestratorConn
     # Delete Instance of Application
     del Workbook
     del xlapp
-
-    orchestrator_connection.log_info(f"[Ok] Excel file at {file_path} has been refreshed and saved.")
 
 def upload_file_to_sharepoint(client: ClientContext, sharepoint_file_url: str, local_file_path: str, custom_function, orchestrator_connection: OrchestratorConnection):
     """

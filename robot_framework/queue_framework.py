@@ -4,6 +4,9 @@
 # pylint: disable=duplicate-code
 
 import sys
+import pyodbc
+import json
+from datetime import datetime, timedelta, timezone
 
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
 from OpenOrchestrator.database.queues import QueueStatus
@@ -13,9 +16,6 @@ from robot_framework import reset
 from robot_framework.exceptions import handle_error, BusinessError, log_exception
 from robot_framework import process
 from robot_framework import config
-from datetime import datetime, timedelta, timezone
-import pyodbc
-import json
 
 def main():
     """The entry point for the framework. Should be called as the first thing when running the robot."""
