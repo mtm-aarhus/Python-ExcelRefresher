@@ -3,7 +3,6 @@
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
 from OpenOrchestrator.database.queues import QueueElement
 import os
-import pythoncom
 import gc
 import win32com.client
 from office365.runtime.auth.user_credential import UserCredential
@@ -52,9 +51,6 @@ def process(orchestrator_connection: OrchestratorConnection, queue_element: Queu
 
         upload_file_to_sharepoint(client, folder_path, local_file_path, custom_function, orchestrator_connection)
     except Exception as e:
-        # Uninitialize the COM library
-        pythoncom.CoUninitialize()
-
         # Force garbage collection to release COM objects
         gc.collect()
         subprocess.call("taskkill /im excel.exe /f >nul 2>&1", shell=True)
