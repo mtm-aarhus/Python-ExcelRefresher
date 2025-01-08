@@ -121,7 +121,7 @@ def download_file_from_sharepoint(client: ClientContext, sharepoint_file_url: st
     orchestrator_connection.log_info(f"[Ok] file has been downloaded into: {download_path}")
     return download_path
 
-@concurrent.process(timeout=1800)  # Timeout after 30 minutes (1800 seconds)
+@concurrent.process(timeout=3600)  # Timeout after 60 minutes (3600 seconds)
 def refresh_excel_file(file_path: str):
     """
     Refreshes an Excel file at the specified file path.
