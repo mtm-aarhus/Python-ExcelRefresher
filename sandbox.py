@@ -5,21 +5,26 @@ from office365.runtime.auth.user_credential import UserCredential
 from office365.sharepoint.client_context import ClientContext
 import time
 
-def sharepoint_client(username: str, password: str, sharepoint_site_url: str) -> ClientContext:
+def sharepoint_client(tenant: str, client_id: str, thumbprint: str, cert_path: str, sharepoint_site_url: str, orchestrator_connection: OrchestratorConnection) -> ClientContext:
     """
     Creates and returns a SharePoint client context.
     """
     # Authenticate to SharePoint
-    ctx = ClientContext(sharepoint_site_url).with_credentials(UserCredential(username, password))
+    cert_credentials = {
+        "tenant": tenant,
+        "client_id": client_id,
+        "thumbprint": thumbprint,
+        "cert_path": cert_path
+    }
+    ctx = ClientContext(sharepoint_site_url).with_client_certificate(**cert_credentials)
 
     # Load and verify connection
     web = ctx.web
     ctx.load(web)
     ctx.execute_query()
 
-    print(f"Authenticated successfully. Site Title: {web.properties['Title']}")
+    orchestrator_connection.log_info(f"Authenticated successfully. Site Title: {web.properties['Title']}")
     return ctx
-
 
 def download_file_from_sharepoint(client: ClientContext, sharepoint_file_url: str) -> str:
     """
@@ -145,6 +150,8 @@ SHAREPOINT_SITE_URL = "https://aarhuskommune.sharepoint.com/Teams/tea-teamsite12
 sharepoint_file_url = "Delte dokumenter/filename.xlsx"
 
 # 1. Create the SharePoint client
+
+
 client = sharepoint_client(username, password, SHAREPOINT_SITE_URL)
 
 # 2. Download the file from SharePoint

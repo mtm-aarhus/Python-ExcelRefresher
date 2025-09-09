@@ -22,10 +22,17 @@ def process(orchestrator_connection: OrchestratorConnection, queue_element: Queu
     sharepoint_site = data.get("SharePointSite")
     folder_path = data.get("FolderPath")
     custom_function = data.get("CustomFunction")
+    
+    tenant = api.username
+    client_id = api.password
+    thumbprint = certification.username
+    cert_path = certification.password
+    
+    certification = orchestrator_connection.get_credential("SharePointCert")
+    api = orchestrator_connection.get_credential("SharePointAPI")
 
-    RobotCredentials = orchestrator_connection.get_credential("Robot365User")
-    username = RobotCredentials.username
-    password = RobotCredentials.password
+    client = sharepoint_client(tenant, client_id, thumbprint, cert_path, sharepoint_site, orchestrator_connection)
+
 
         # 1. Create the SharePoint client
     client = sharepoint_client(username, password, sharepoint_site, orchestrator_connection)
@@ -59,12 +66,18 @@ def process(orchestrator_connection: OrchestratorConnection, queue_element: Queu
         orchestrator_connection.log_error(str(e))
         raise e
 
-def sharepoint_client(username: str, password: str, sharepoint_site_url: str, orchestrator_connection: OrchestratorConnection) -> ClientContext:
+def sharepoint_client(tenant: str, client_id: str, thumbprint: str, cert_path: str, sharepoint_site_url: str, orchestrator_connection: OrchestratorConnection) -> ClientContext:
     """
     Creates and returns a SharePoint client context.
     """
     # Authenticate to SharePoint
-    ctx = ClientContext(sharepoint_site_url).with_credentials(UserCredential(username, password))
+    cert_credentials = {
+        "tenant": tenant,
+        "client_id": client_id,
+        "thumbprint": thumbprint,
+        "cert_path": cert_path
+    }
+    ctx = ClientContext(sharepoint_site_url).with_client_certificate(**cert_credentials)
 
     # Load and verify connection
     web = ctx.web
@@ -73,7 +86,6 @@ def sharepoint_client(username: str, password: str, sharepoint_site_url: str, or
 
     orchestrator_connection.log_info(f"Authenticated successfully. Site Title: {web.properties['Title']}")
     return ctx
-
 
 def download_file_from_sharepoint(client: ClientContext, sharepoint_file_url: str, orchestrator_connection: OrchestratorConnection) -> str:
     """
