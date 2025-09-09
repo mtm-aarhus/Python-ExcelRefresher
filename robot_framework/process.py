@@ -22,6 +22,8 @@ def process(orchestrator_connection: OrchestratorConnection, queue_element: Queu
     sharepoint_site = data.get("SharePointSite")
     folder_path = data.get("FolderPath")
     custom_function = data.get("CustomFunction")
+    certification = orchestrator_connection.get_credential("SharePointCert")
+    api = orchestrator_connection.get_credential("SharePointAPI")
     
     tenant = api.username
     client_id = api.password
