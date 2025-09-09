@@ -33,10 +33,6 @@ def process(orchestrator_connection: OrchestratorConnection, queue_element: Queu
 
     client = sharepoint_client(tenant, client_id, thumbprint, cert_path, sharepoint_site, orchestrator_connection)
 
-
-        # 1. Create the SharePoint client
-    client = sharepoint_client(username, password, sharepoint_site, orchestrator_connection)
-
     try:
         # 2. Download the file from SharePoint
         local_file_path = download_file_from_sharepoint(client, folder_path, orchestrator_connection)
