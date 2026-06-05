@@ -3,6 +3,7 @@ import os
 from robot_framework.process import process
 from OpenOrchestrator.database.queues import QueueElement, QueueStatus
 import json
+from multiprocessing import freeze_support
 from typing import Optional
 
 def make_queue_element_with_payload(
@@ -25,22 +26,22 @@ def make_queue_element_with_payload(
         created_by=created_by,
     )
 
-raw_json = """{
-    "KopierKøelementFraOpenOrchestrator": "OgIndsætDetSomRaw_Json",
-}"""
+def main():
+    raw_json = """{
+        "KopierKøelementFraOpenOrchestrator": "OgIndsætDetSomRaw_Json",
+    }"""
 
-payload = json.loads(raw_json)
+    payload = json.loads(raw_json)
 
+    qe = make_queue_element_with_payload(
+        payload=payload,
+        queue_name="ExcelRefresher",
+        reference="Sandbox",
+        status=QueueStatus.NEW, 
+    )
 
-qe = make_queue_element_with_payload(
-    payload=payload,
-    queue_name="ExcelRefresher",
-    reference="Sandbox",
-    status=QueueStatus.NEW, 
-)
-
-orchestrator_connection = OrchestratorConnection(
-        "ExceLRefresher",
+    orchestrator_connection = OrchestratorConnection(
+        "ExcelRefresher",
         os.getenv("OpenOrchestratorSQL"),
         os.getenv("OpenOrchestratorKey"),
         None,
@@ -48,5 +49,9 @@ orchestrator_connection = OrchestratorConnection(
         None
     )
 
+    process(orchestrator_connection, qe)
 
-process(orchestrator_connection, qe)
+
+if __name__ == "__main__":
+    freeze_support()
+    main()

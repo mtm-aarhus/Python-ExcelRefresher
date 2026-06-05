@@ -14,6 +14,10 @@ import locale
 from pebble import concurrent
 import subprocess
 
+SHAREPOINT_SMALL_UPLOAD_LIMIT = 4 * 1024 * 1024
+SHAREPOINT_UPLOAD_CHUNK_SIZE = 10 * 1024 * 1024
+
+
 def process(orchestrator_connection: OrchestratorConnection, queue_element: QueueElement | None = None) -> None:
     """Do the primary process of the robot."""
     orchestrator_connection.log_trace("Running process.")
@@ -186,11 +190,16 @@ def upload_file_to_sharepoint(client: ClientContext, sharepoint_file_url: str, l
     client.execute_query()
 
     # Upload the file to the correct folder in SharePoint
-    with open(local_file_path, "rb") as file_content:
-        uploaded_file = target_folder.upload_file(file_name, file_content).execute_query()
+    uploaded_file = _upload_file_to_sharepoint_folder(
+        target_folder,
+        local_file_path,
+        file_name,
+        orchestrator_connection,
+    )
 
-
-    orchestrator_connection.log_info(f"[Ok] file has been uploaded to: {uploaded_file.serverRelativeUrl} on SharePoint")
+    orchestrator_connection.log_info(
+        f"[Ok] file has been uploaded to: {_get_server_relative_url(uploaded_file)} on SharePoint"
+    )
 
     if custom_function == "MonthlyFolder":
         orchestrator_connection.log_info(f"Custom function: {custom_function}")
@@ -207,8 +216,67 @@ def upload_file_to_sharepoint(client: ClientContext, sharepoint_file_url: str, l
         year_folder = parent_folder.folders.add(current_year).execute_query()
         month_folder = year_folder.folders.add(current_month).execute_query()
 
-        with open(local_file_path, "rb") as file_content:
-            uploaded_file_2 = month_folder.upload_file(f'DKPlan_{current_month}_{current_year}.xlsx', file_content).execute_query()
-        orchestrator_connection.log_info(f"[Ok] file has been uploaded to: {uploaded_file_2.serverRelativeUrl} on SharePoint")
+        archive_file_name = f'DKPlan_{current_month}_{current_year}.xlsx'
+        uploaded_file_2 = _upload_file_to_sharepoint_folder(
+            month_folder,
+            local_file_path,
+            archive_file_name,
+            orchestrator_connection,
+        )
+        orchestrator_connection.log_info(
+            f"[Ok] file has been uploaded to: {_get_server_relative_url(uploaded_file_2)} on SharePoint"
+        )
             
     os.remove(local_file_path)
+
+
+def _upload_file_to_sharepoint_folder(
+    target_folder,
+    local_file_path: str,
+    file_name: str,
+    orchestrator_connection: OrchestratorConnection,
+):
+    file_size = os.path.getsize(local_file_path)
+
+    if file_size <= SHAREPOINT_SMALL_UPLOAD_LIMIT:
+        try:
+            with open(local_file_path, "rb") as file_content:
+                return target_folder.files.add(
+                    file_name,
+                    file_content.read(),
+                    True,
+                ).execute_query()
+        except Exception as e:
+            orchestrator_connection.log_info(
+                f"Normal upload failed for '{file_name}', switching to chunked upload. Error: {e}"
+            )
+
+    def log_upload_progress(uploaded_bytes):
+        if uploaded_bytes == 0:
+            return
+
+        percent_uploaded = (
+            round(uploaded_bytes / file_size * 100, 2)
+            if file_size
+            else 100
+        )
+        orchestrator_connection.log_info(
+            f"Uploaded {uploaded_bytes} bytes of {file_size} ({percent_uploaded}%) for '{file_name}'"
+        )
+
+    with open(local_file_path, "rb") as file_content:
+        return target_folder.files.create_upload_session(
+            file_content,
+            SHAREPOINT_UPLOAD_CHUNK_SIZE,
+            log_upload_progress,
+            file_name=file_name,
+        ).execute_query()
+
+
+def _get_server_relative_url(uploaded_file):
+    properties = getattr(uploaded_file, "properties", {})
+    return (
+        getattr(uploaded_file, "server_relative_url", None)
+        or getattr(uploaded_file, "serverRelativeUrl", None)
+        or properties.get("ServerRelativeUrl")
+    )
