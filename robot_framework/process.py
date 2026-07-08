@@ -305,8 +305,10 @@ def upload_file_to_sharepoint(client: ClientContext, sharepoint_file_url: str, l
     if custom_function == "VeryRefreshed":
         orchestrator_connection.log_info(f"Custom function: {custom_function}")
         send_faktura_mail(local_file_path, file_name, orchestrator_connection)
-            
-    os.remove(local_file_path)
+    try:            
+        os.remove(local_file_path)
+    except:
+        orchestrator_connection.log_error('Failed in removing file')
 
 
 def _upload_file_to_sharepoint_folder(
@@ -366,7 +368,8 @@ def send_faktura_mail(local_file_path: str, file_name: str, orchestrator_connect
     smtp_port = 25
     sender = "robotinfo@aarhus.dk"
 
-    recipients = orchestrator_connection.get_constant("EmailExcelRefreshLukkedeBrugere")
+    # recipients = orchestrator_connection.get_constant("EmailExcelRefreshLukkedeBrugere")
+    recipients = orchestrator_connection.get_constant('balas').value
 
     subject = "Genstart af fakturaer ved lukkede brugere"
     html_body = """
