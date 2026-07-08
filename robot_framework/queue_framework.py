@@ -17,6 +17,7 @@ from robot_framework.exceptions import handle_error, BusinessError, log_exceptio
 from robot_framework import process
 from robot_framework import config
 
+
 def main():
     """The entry point for the framework. Should be called as the first thing when running the robot."""
     orchestrator_connection = OrchestratorConnection.create_connection_from_args()
@@ -32,36 +33,41 @@ def main():
     current_time = datetime.now(timezone.utc)  # Timezone-aware UTC time
     time_threshold = current_time - timedelta(hours=20)
 
-    # Step 1: Fetch rows where the timestamp is more than 20 hours old
+    # VeryRefreshed må kun køre om onsdagen.
+    is_wednesday = 1 if datetime.now().weekday() == 2 else 0
+
+    # Step 1: Hent forfaldne rækker – VeryRefreshed dog kun om mandagen
     query = """
     SELECT SharePointSite, FolderPath, CustomFunction
     FROM [PyOrchestrator].[dbo].[QueueExcelRefresher]
-    WHERE TimeStamp < ? OR TimeStamp IS NULL
+    WHERE (TimeStamp < ? OR TimeStamp IS NULL)
+      AND (COALESCE(CustomFunction, '') <> 'VeryRefreshed' OR ? = 1)
     """
     cursor = conn.cursor()
-    cursor.execute(query, time_threshold)
+    cursor.execute(query, time_threshold, is_wednesday)
 
-    # Retrieve data and prepare `references` and `data`
     rows = cursor.fetchall()
     if rows:
-        references = tuple(row[1] for row in rows)  # Using FolderPath as the reference
+        references = tuple(row[1] for row in rows)
 
-        # Convert each row to a JSON string for structured data storage
         data = tuple(json.dumps({
             "SharePointSite": row[0],
             "FolderPath": row[1],
             "CustomFunction": row[2]
         }) for row in rows)
 
-        # Call bulk_create_queue_elements with JSON-formatted data
         orchestrator_connection.bulk_create_queue_elements("ExcelRefresher", references=references, data=data)
+
         update_query = """
         UPDATE [PyOrchestrator].[dbo].[QueueExcelRefresher]
-        SET TimeStamp = ? WHERE TimeStamp < ? OR TimeStamp IS NULL
+        SET TimeStamp = ?
+        WHERE (TimeStamp < ? OR TimeStamp IS NULL)
+          AND (COALESCE(CustomFunction, '') <> 'VeryRefreshed' OR ? = 1)
         """
-        cursor.execute(update_query, (current_time, time_threshold))
+        cursor.execute(update_query, (current_time, time_threshold, is_wednesday))
         conn.commit()
 
+        
     queue_element = None
     error_count = 0
     task_count = 0
@@ -70,7 +76,7 @@ def main():
         try:
             reset.reset(orchestrator_connection)
 
-            # Queue loop
+               # Queue loop
             while task_count < config.MAX_TASK_COUNT:
                 task_count += 1
                 queue_element = orchestrator_connection.get_next_queue_element(config.QUEUE_NAME)
@@ -97,6 +103,12 @@ def main():
                 except BusinessError as error:
                     handle_error("Business Error", error, queue_element, orchestrator_connection)
 
+                except Exception as error:
+                    # Isolér fejl pr. køelement: markér FAILED og fortsæt med resten af køen
+                    error_count += 1
+                    handle_error(f"Process Error #{error_count}", error, queue_element, orchestrator_connection)
+                    reset.reset(orchestrator_connection)
+
             break  # Break retry loop
 
         # We actually want to catch all exceptions possible here.
@@ -109,7 +121,7 @@ def main():
     reset.close_all(orchestrator_connection)
     reset.kill_all(orchestrator_connection)
 
-    if config.FAIL_ROBOT_ON_TOO_MANY_ERRORS and error_count == config.MAX_RETRY_COUNT:
+    if config.FAIL_ROBOT_ON_TOO_MANY_ERRORS and error_count >= config.MAX_RETRY_COUNT:
         raise RuntimeError("Process failed too many times.")
 
 main()

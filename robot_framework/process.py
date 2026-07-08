@@ -13,6 +13,10 @@ import datetime
 import locale
 from pebble import concurrent
 import subprocess
+import smtplib
+import shutil
+import tempfile
+from email.message import EmailMessage
 
 SHAREPOINT_SMALL_UPLOAD_LIMIT = 4 * 1024 * 1024
 SHAREPOINT_UPLOAD_CHUNK_SIZE = 10 * 1024 * 1024
@@ -44,7 +48,10 @@ def process(orchestrator_connection: OrchestratorConnection, queue_element: Queu
         local_file_path = download_file_from_sharepoint(client, folder_path, orchestrator_connection)
 
          # Run refresh_excel_file with timeout handling
-        future = refresh_excel_file(local_file_path)
+        if custom_function == "VeryRefreshed": 
+            future = refresh_excel_file_pivot(local_file_path)
+        else:
+            future = refresh_excel_file(local_file_path)
 
         try:
             future.result()  # Wait for the result
@@ -134,6 +141,74 @@ def download_file_from_sharepoint(client: ClientContext, sharepoint_file_url: st
 
     orchestrator_connection.log_info(f"[Ok] file has been downloaded into: {download_path}")
     return download_path
+
+@concurrent.process(timeout=3600)  # Timeout after 60 minutes
+def refresh_excel_file_pivot(file_path: str):
+    """
+    Refreshes a workbook containing query tables and pivottables.
+
+    RefreshAll() alene var upålidelig for netop denne fil (pivottabel i A5),
+    så refresh sker synkront i fast rækkefølge:
+    1) WorkbookConnections, 2) ListObjects/QueryTables, 3) PivotCaches, 4) PivotTables.
+    """
+    xlapp = win32com.client.DispatchEx("Excel.Application")
+    xlapp.Visible = False
+    xlapp.DisplayAlerts = False
+
+    workbook = xlapp.Workbooks.Open(file_path)
+    try:
+        # 1. Data connections – synkront (slå baggrundskørsel fra)
+        connections = workbook.Connections
+        for i in range(1, connections.Count + 1):
+            connection = connections.Item(i)
+            try:
+                connection.OLEDBConnection.BackgroundQuery = False
+            except Exception:
+                pass
+            try:
+                connection.ODBCConnection.BackgroundQuery = False
+            except Exception:
+                pass
+            connection.Refresh()
+
+        # 2. Query-tabeller (ListObjects) på hvert ark
+        for s in range(1, workbook.Worksheets.Count + 1):
+            list_objects = workbook.Worksheets.Item(s).ListObjects
+            for lo in range(1, list_objects.Count + 1):
+                try:
+                    query_table = list_objects.Item(lo).QueryTable
+                except Exception:
+                    query_table = None
+                if query_table is not None:
+                    try:
+                        query_table.BackgroundQuery = False
+                    except Exception:
+                        pass
+                    query_table.Refresh()
+
+        # 3. Pivot-caches
+        pivot_caches = workbook.PivotCaches()
+        for pc in range(1, pivot_caches.Count + 1):
+            cache = pivot_caches.Item(pc)
+            try:
+                cache.BackgroundQuery = False
+            except Exception:
+                pass
+            cache.Refresh()
+
+        # 4. Individuelle pivottabeller
+        for s in range(1, workbook.Worksheets.Count + 1):
+            pivot_tables = workbook.Worksheets.Item(s).PivotTables()
+            for pt in range(1, pivot_tables.Count + 1):
+                pivot_tables.Item(pt).RefreshTable()
+
+        xlapp.CalculateUntilAsyncQueriesDone()
+        workbook.Save()
+        workbook.Close(SaveChanges=True)
+    finally:
+        xlapp.Quit()
+        del workbook
+        del xlapp
 
 @concurrent.process(timeout=3600)  # Timeout after 60 minutes (3600 seconds)
 def refresh_excel_file(file_path: str):
@@ -226,6 +301,10 @@ def upload_file_to_sharepoint(client: ClientContext, sharepoint_file_url: str, l
         orchestrator_connection.log_info(
             f"[Ok] file has been uploaded to: {_get_server_relative_url(uploaded_file_2)} on SharePoint"
         )
+        
+    if custom_function == "VeryRefreshed":
+        orchestrator_connection.log_info(f"Custom function: {custom_function}")
+        send_faktura_mail(local_file_path, file_name, orchestrator_connection)
             
     os.remove(local_file_path)
 
@@ -280,3 +359,60 @@ def _get_server_relative_url(uploaded_file):
         or getattr(uploaded_file, "serverRelativeUrl", None)
         or properties.get("ServerRelativeUrl")
     )
+
+def send_faktura_mail(local_file_path: str, file_name: str, orchestrator_connection: OrchestratorConnection):
+    """Sender det opdaterede regneark som vedhæftning til faktura-modtagerne."""
+    smtp_server = "smtp.adm.aarhuskommune.dk"
+    smtp_port = 25
+    sender = "robotinfo@aarhus.dk"
+
+    recipients = orchestrator_connection.get_constant("EmailExcelRefreshLukkedeBrugere")
+
+    subject = "Genstart af fakturaer ved lukkede brugere"
+    html_body = """
+    <html>
+      <body>
+        <p>Hej Rikke og Lenette,</p>
+        <p>Hermed et regneark med fakturaer ved lukkede brugere. De kan ses i det vedhæftede regneark. Bemærk at jeg ikke har genstartet dem, så det tænker jeg, I skal gøre.</p>
+        <p>Mvh,<br>Torben</p>
+      </body>
+    </html>
+    """
+
+    # Kopiér til temp så en tilbageværende Excel-lås ikke blokerer vedhæftningen
+    base = os.path.basename(local_file_path)
+    tmp_path = os.path.join(tempfile.gettempdir(), f"mail_{int(time.time() * 1000)}_{base}")
+    delay = 0.3
+    for attempt in range(1, 6):
+        try:
+            shutil.copyfile(local_file_path, tmp_path)
+            break
+        except PermissionError:
+            if attempt == 5:
+                raise
+            time.sleep(delay)
+            delay *= 1.7
+
+    msg = EmailMessage()
+    msg["From"] = sender
+    msg["To"] = recipients
+    msg["Subject"] = subject
+    msg.set_content("Aktiver HTML for at se denne besked.")
+    msg.add_alternative(html_body, subtype="html")
+
+    try:
+        with open(tmp_path, "rb") as f:
+            msg.add_attachment(
+                f.read(),
+                maintype="application",
+                subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                filename=file_name,
+            )
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=30) as smtp:
+            smtp.send_message(msg)
+        orchestrator_connection.log_info(f"[Ok] Faktura-mail sendt til {recipients}")
+    finally:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
