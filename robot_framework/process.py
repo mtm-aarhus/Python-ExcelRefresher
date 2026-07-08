@@ -145,11 +145,8 @@ def download_file_from_sharepoint(client: ClientContext, sharepoint_file_url: st
 @concurrent.process(timeout=3600)  # Timeout after 60 minutes
 def refresh_excel_file_pivot(file_path: str):
     """
-    Refreshes a workbook containing query tables and pivottables.
-
-    RefreshAll() alene var upålidelig for netop denne fil (pivottabel i A5),
-    så refresh sker synkront i fast rækkefølge:
-    1) WorkbookConnections, 2) ListObjects/QueryTables, 3) PivotCaches, 4) PivotTables.
+    Refresh via RefreshAll (håndterer connection-/query-afhængigheder i rigtig
+    rækkefølge), efterfulgt af eksplicit pivot-refresh for at sikre pivottabellen.
     """
     xlapp = win32com.client.DispatchEx("Excel.Application")
     xlapp.Visible = False
@@ -157,7 +154,7 @@ def refresh_excel_file_pivot(file_path: str):
 
     workbook = xlapp.Workbooks.Open(file_path)
     try:
-        # 1. Data connections – synkront (slå baggrundskørsel fra)
+        # Slå baggrundskørsel fra på alle connections så RefreshAll bliver synkront
         connections = workbook.Connections
         for i in range(1, connections.Count + 1):
             connection = connections.Item(i)
@@ -169,34 +166,19 @@ def refresh_excel_file_pivot(file_path: str):
                 connection.ODBCConnection.BackgroundQuery = False
             except Exception:
                 pass
-            connection.Refresh()
 
-        # 2. Query-tabeller (ListObjects) på hvert ark
-        for s in range(1, workbook.Worksheets.Count + 1):
-            list_objects = workbook.Worksheets.Item(s).ListObjects
-            for lo in range(1, list_objects.Count + 1):
-                try:
-                    query_table = list_objects.Item(lo).QueryTable
-                except Exception:
-                    query_table = None
-                if query_table is not None:
-                    try:
-                        query_table.BackgroundQuery = False
-                    except Exception:
-                        pass
-                    query_table.Refresh()
+        # Lad Excel selv opdatere alt i korrekt afhængighedsrækkefølge
+        workbook.RefreshAll()
+        xlapp.CalculateUntilAsyncQueriesDone()
 
-        # 3. Pivot-caches
+        # Tving pivot-caches og -tabeller bagefter (var den upålidelige del i UiPath)
         pivot_caches = workbook.PivotCaches()
         for pc in range(1, pivot_caches.Count + 1):
-            cache = pivot_caches.Item(pc)
             try:
-                cache.BackgroundQuery = False
+                pivot_caches.Item(pc).Refresh()
             except Exception:
                 pass
-            cache.Refresh()
 
-        # 4. Individuelle pivottabeller
         for s in range(1, workbook.Worksheets.Count + 1):
             pivot_tables = workbook.Worksheets.Item(s).PivotTables()
             for pt in range(1, pivot_tables.Count + 1):
@@ -307,7 +289,7 @@ def upload_file_to_sharepoint(client: ClientContext, sharepoint_file_url: str, l
         send_faktura_mail(local_file_path, file_name, orchestrator_connection)
     try:            
         os.remove(local_file_path)
-    except:
+    except Exception:
         orchestrator_connection.log_error('Failed in removing file')
 
 
