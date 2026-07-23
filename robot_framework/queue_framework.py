@@ -34,7 +34,7 @@ def main():
     time_threshold = current_time - timedelta(hours=20)
 
     # VeryRefreshed må kun køre om onsdagen.
-    is_wednesday = 1 if datetime.now().weekday() == 2 else 0
+    is_wednesday = 1 if datetime.now().weekday() == 3 else 0
 
     # Step 1: Hent forfaldne rækker – VeryRefreshed dog kun om mandagen
     query = """
