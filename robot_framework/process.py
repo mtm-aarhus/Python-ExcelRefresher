@@ -350,8 +350,8 @@ def send_faktura_mail(local_file_path: str, file_name: str, orchestrator_connect
     smtp_port = 25
     sender = "robotinfo@aarhus.dk"
 
-    # recipients = orchestrator_connection.get_constant("EmailExcelRefreshLukkedeBrugere")
-    recipients = orchestrator_connection.get_constant('balas').value
+    recipients = orchestrator_connection.get_constant("EmailExcelRefreshLukkedeBrugere")
+    # recipients = orchestrator_connection.get_constant('balas').value
 
     subject = "Genstart af fakturaer ved lukkede brugere"
     html_body = """
