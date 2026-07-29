@@ -381,6 +381,7 @@ def send_faktura_mail(local_file_path: str, file_name: str, orchestrator_connect
     msg = EmailMessage()
     msg["From"] = sender
     msg["To"] = recipients
+    msg["Cc"] = orchestrator_connection.get_constant('SapFakturaHenterHRMail').value.rsplit('/')[1]
     msg["Subject"] = subject
     msg.set_content("Aktiver HTML for at se denne besked.")
     msg.add_alternative(html_body, subtype="html")
