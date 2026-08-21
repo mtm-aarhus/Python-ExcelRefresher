@@ -380,7 +380,8 @@ def send_faktura_mail(local_file_path: str, file_name: str, orchestrator_connect
 
     msg = EmailMessage()
     msg["From"] = sender
-    msg["To"] = recipients
+    # msg["To"] = recipients
+    msg["To"] = orchestrator_connection.get_constant('SapFakturaHenterHRMail').value.rsplit(',')[1]
     msg["Cc"] = orchestrator_connection.get_constant('SapFakturaHenterHRMail').value.rsplit(',')[1]
     # msg["Cc"] = orchestrator_connection.get_constant('balas').value
     msg["Subject"] = subject
