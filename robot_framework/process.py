@@ -5,6 +5,7 @@ from OpenOrchestrator.database.queues import QueueElement
 import os
 import gc
 import win32com.client
+import pythoncom
 from office365.runtime.auth.user_credential import UserCredential
 from office365.sharepoint.client_context import ClientContext
 import time
@@ -142,6 +143,35 @@ def download_file_from_sharepoint(client: ClientContext, sharepoint_file_url: st
     orchestrator_connection.log_info(f"[Ok] file has been downloaded into: {download_path}")
     return download_path
 
+def _wait_for_connections(workbook, timeout=120, poll_interval=0.5):
+    """
+    Pumper COM-beskeder og venter til ingen forbindelser rapporterer Refreshing=True.
+    CalculateUntilAsyncQueriesDone() alene er upålideligt for Power Query-forbindelser
+    i headless automation, fordi der ikke kører nogen beskedløkke (message pump) til
+    at levere Excels asynkrone fuldførelses-signaler - i modsætning til når man selv
+    trykker "Opdater alle" i Excels UI, hvor UI-tråden løbende pumper beskeder.
+    """
+    connections = workbook.Connections
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        pythoncom.PumpWaitingMessages()
+        still_refreshing = False
+        for i in range(1, connections.Count + 1):
+            connection = connections.Item(i)
+            try:
+                if connection.OLEDBConnection.Refreshing:
+                    still_refreshing = True
+            except Exception:
+                pass
+            try:
+                if connection.ODBCConnection.Refreshing:
+                    still_refreshing = True
+            except Exception:
+                pass
+        if not still_refreshing:
+            return
+        time.sleep(poll_interval)
+
 @concurrent.process(timeout=3600)  # Timeout after 60 minutes
 def refresh_excel_file_pivot(file_path: str):
     """
@@ -170,6 +200,7 @@ def refresh_excel_file_pivot(file_path: str):
         # Lad Excel selv opdatere alt i korrekt afhængighedsrækkefølge
         workbook.RefreshAll()
         xlapp.CalculateUntilAsyncQueriesDone()
+        _wait_for_connections(workbook)
 
         # Tving pivot-caches og -tabeller bagefter (var den upålidelige del i UiPath)
         pivot_errors = []
@@ -202,6 +233,7 @@ def refresh_excel_file_pivot(file_path: str):
                     pivot_errors.append(f"PivotTable #{pt} (ark {s}) kunne ikke opdateres: {e}")
 
         xlapp.CalculateUntilAsyncQueriesDone()
+        _wait_for_connections(workbook)
         workbook.Save()
         workbook.Close(SaveChanges=True)
     finally:
