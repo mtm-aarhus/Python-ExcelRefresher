@@ -172,17 +172,34 @@ def refresh_excel_file_pivot(file_path: str):
         xlapp.CalculateUntilAsyncQueriesDone()
 
         # Tving pivot-caches og -tabeller bagefter (var den upålidelige del i UiPath)
+        pivot_errors = []
         pivot_caches = workbook.PivotCaches()
         for pc in range(1, pivot_caches.Count + 1):
+            cache = pivot_caches.Item(pc)
+            # PivotCache har sin egen forbindelse, adskilt fra workbook.Connections
+            # ovenfor - skal også sættes til ikke-asynkron for at Refresh() er synkron.
             try:
-                pivot_caches.Item(pc).Refresh()
+                cache.OLEDBConnection.BackgroundQuery = False
             except Exception:
                 pass
+            try:
+                cache.ODBCConnection.BackgroundQuery = False
+            except Exception:
+                pass
+            try:
+                cache.Refresh()
+            except Exception as e:
+                pivot_errors.append(f"PivotCache #{pc} kunne ikke opdateres: {e}")
+
+        xlapp.CalculateUntilAsyncQueriesDone()
 
         for s in range(1, workbook.Worksheets.Count + 1):
             pivot_tables = workbook.Worksheets.Item(s).PivotTables()
             for pt in range(1, pivot_tables.Count + 1):
-                pivot_tables.Item(pt).RefreshTable()
+                try:
+                    pivot_tables.Item(pt).RefreshTable()
+                except Exception as e:
+                    pivot_errors.append(f"PivotTable #{pt} (ark {s}) kunne ikke opdateres: {e}")
 
         xlapp.CalculateUntilAsyncQueriesDone()
         workbook.Save()
@@ -191,6 +208,11 @@ def refresh_excel_file_pivot(file_path: str):
         xlapp.Quit()
         del workbook
         del xlapp
+
+    if pivot_errors:
+        raise RuntimeError(
+            "Et eller flere pivot-objekter kunne ikke opdateres: " + "; ".join(pivot_errors)
+        )
 
 @concurrent.process(timeout=3600)  # Timeout after 60 minutes (3600 seconds)
 def refresh_excel_file(file_path: str):
@@ -381,8 +403,9 @@ def send_faktura_mail(local_file_path: str, file_name: str, orchestrator_connect
     msg = EmailMessage()
     msg["From"] = sender
     # msg["To"] = recipients
-    msg["To"] = orchestrator_connection.get_constant('SapFakturaHenterHRMail').value.rsplit(',')[1]
-    msg["Cc"] = orchestrator_connection.get_constant('SapFakturaHenterHRMail').value.rsplit(',')[1]
+    msg["To"] = orchestrator_connection.get_constant('balas').value
+    # msg["To"] = orchestrator_connection.get_constant('SapFakturaHenterHRMail').value.rsplit(',')[1]
+    # msg["Cc"] = orchestrator_connection.get_constant('SapFakturaHenterHRMail').value.rsplit(',')[1]
     # msg["Cc"] = orchestrator_connection.get_constant('balas').value
     msg["Subject"] = subject
     msg.set_content("Aktiver HTML for at se denne besked.")
