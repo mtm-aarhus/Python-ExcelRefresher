@@ -66,7 +66,7 @@ def process(orchestrator_connection: OrchestratorConnection, queue_element: Queu
                 orchestrator_connection.log_error(f"An error occurred during refresh_excel_file execution: {e}")
                 raise RuntimeError(f"Error in refresh_excel_file: {e}")
 
-        upload_file_to_sharepoint(client, folder_path, local_file_path, custom_function, orchestrator_connection)
+        # upload_file_to_sharepoint(client, folder_path, local_file_path, custom_function, orchestrator_connection)
     except Exception as e:
         # Force garbage collection to release COM objects
         gc.collect()
