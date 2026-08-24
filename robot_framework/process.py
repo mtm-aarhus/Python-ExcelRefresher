@@ -47,12 +47,7 @@ def process(orchestrator_connection: OrchestratorConnection, queue_element: Queu
     try:
         # 2. Download the file from SharePoint
         local_file_path = download_file_from_sharepoint(client, folder_path, orchestrator_connection)
-
-         # Run refresh_excel_file with timeout handling
-        if custom_function == "VeryRefreshed": 
-            future = refresh_excel_file(local_file_path)
-        else:
-            future = refresh_excel_file(local_file_path)
+        future = refresh_excel_file(local_file_path)
 
         try:
             future.result()  # Wait for the result
@@ -172,79 +167,6 @@ def _wait_for_connections(workbook, timeout=120, poll_interval=0.5):
             return
         time.sleep(poll_interval)
 
-@concurrent.process(timeout=3600)  # Timeout after 60 minutes
-def refresh_excel_file_pivot(file_path: str):
-    """
-    Refresh via RefreshAll (håndterer connection-/query-afhængigheder i rigtig
-    rækkefølge), efterfulgt af eksplicit pivot-refresh for at sikre pivottabellen.
-    """
-    xlapp = win32com.client.DispatchEx("Excel.Application")
-    xlapp.Visible = False
-    xlapp.DisplayAlerts = False
-
-    workbook = xlapp.Workbooks.Open(file_path)
-    try:
-        # Slå baggrundskørsel fra på alle connections så RefreshAll bliver synkront
-        connections = workbook.Connections
-        for i in range(1, connections.Count + 1):
-            connection = connections.Item(i)
-            try:
-                connection.OLEDBConnection.BackgroundQuery = False
-            except Exception:
-                pass
-            try:
-                connection.ODBCConnection.BackgroundQuery = False
-            except Exception:
-                pass
-
-        # Lad Excel selv opdatere alt i korrekt afhængighedsrækkefølge
-        workbook.RefreshAll()
-        xlapp.CalculateUntilAsyncQueriesDone()
-        _wait_for_connections(workbook)
-
-        # Tving pivot-caches og -tabeller bagefter (var den upålidelige del i UiPath)
-        pivot_errors = []
-        pivot_caches = workbook.PivotCaches()
-        for pc in range(1, pivot_caches.Count + 1):
-            cache = pivot_caches.Item(pc)
-            # PivotCache har sin egen forbindelse, adskilt fra workbook.Connections
-            # ovenfor - skal også sættes til ikke-asynkron for at Refresh() er synkron.
-            try:
-                cache.OLEDBConnection.BackgroundQuery = False
-            except Exception:
-                pass
-            try:
-                cache.ODBCConnection.BackgroundQuery = False
-            except Exception:
-                pass
-            try:
-                cache.Refresh()
-            except Exception as e:
-                pivot_errors.append(f"PivotCache #{pc} kunne ikke opdateres: {e}")
-
-        xlapp.CalculateUntilAsyncQueriesDone()
-
-        for s in range(1, workbook.Worksheets.Count + 1):
-            pivot_tables = workbook.Worksheets.Item(s).PivotTables()
-            for pt in range(1, pivot_tables.Count + 1):
-                try:
-                    pivot_tables.Item(pt).RefreshTable()
-                except Exception as e:
-                    pivot_errors.append(f"PivotTable #{pt} (ark {s}) kunne ikke opdateres: {e}")
-
-        xlapp.CalculateUntilAsyncQueriesDone()
-        _wait_for_connections(workbook)
-        workbook.Save()
-        workbook.Close(SaveChanges=True)
-    finally:
-        xlapp.Quit()
-        del workbook
-        del xlapp
-
-    if pivot_errors:
-        raise RuntimeError(
-            "Et eller flere pivot-objekter kunne ikke opdateres: " + "; ".join(pivot_errors)
-        )
 
 @concurrent.process(timeout=3600)  # Timeout after 60 minutes (3600 seconds)
 def refresh_excel_file(file_path: str):
@@ -435,8 +357,7 @@ def send_faktura_mail(local_file_path: str, file_name: str, orchestrator_connect
     msg = EmailMessage()
     msg["From"] = sender
     # msg["To"] = recipients
-    msg["To"] = orchestrator_connection.get_constant('balas').value
-    # msg["To"] = orchestrator_connection.get_constant('SapFakturaHenterHRMail').value.rsplit(',')[1]
+    msg["To"] = orchestrator_connection.get_constant('SapFakturaHenterHRMail').value.rsplit(',')[1]
     # msg["Cc"] = orchestrator_connection.get_constant('SapFakturaHenterHRMail').value.rsplit(',')[1]
     # msg["Cc"] = orchestrator_connection.get_constant('balas').value
     msg["Subject"] = subject
