@@ -50,7 +50,7 @@ def process(orchestrator_connection: OrchestratorConnection, queue_element: Queu
 
          # Run refresh_excel_file with timeout handling
         if custom_function == "VeryRefreshed": 
-            future = refresh_excel_file_pivot(local_file_path)
+            future = refresh_excel_file(local_file_path)
         else:
             future = refresh_excel_file(local_file_path)
 
